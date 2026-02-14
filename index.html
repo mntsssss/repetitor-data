@@ -984,91 +984,115 @@
         }
 
         // ========== ФОРМИРОВАНИЕ ОТЧЕТА ==========
-        function generateReport() {
-            const reportContainer = document.getElementById('report-container');
-            const reportContent = document.getElementById('report-content');
-            
-            const validLessons = ratesData.filter(lesson => 
-                lesson.student && lesson.student.trim() && 
-                lesson.day && lesson.day.trim() &&
-                lesson.time && lesson.time.trim()
-            );
-            
-            if (validLessons.length === 0) {
-                alert('❌ Нет данных для отчета. Заполните таблицу ставок.');
-                return;
+        // ========== ФОРМИРОВАНИЕ ОТЧЕТА (С СУББОТЫ ПО ПЯТНИЦУ) ==========
+function generateReport() {
+    const reportContainer = document.getElementById('report-container');
+    const reportContent = document.getElementById('report-content');
+    
+    // Фильтруем только заполненные строки
+    const validLessons = ratesData.filter(lesson => 
+        lesson.student && lesson.student.trim() && 
+        lesson.day && lesson.day.trim() &&
+        lesson.time && lesson.time.trim()
+    );
+    
+    if (validLessons.length === 0) {
+        alert('❌ Нет данных для отчета. Заполните таблицу ставок.');
+        return;
+    }
+    
+    // Группируем по дням недели
+    const groupedByDay = {};
+    const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+    const dayShorts = {
+        'пн': 'Понедельник',
+        'вт': 'Вторник',
+        'ср': 'Среда',
+        'чт': 'Четверг',
+        'пт': 'Пятница',
+        'сб': 'Суббота',
+        'вс': 'Воскресенье'
+    };
+    
+    validLessons.forEach(lesson => {
+        const dayShort = lesson.day.toLowerCase().trim();
+        if (dayShorts[dayShort]) {
+            const dayFull = dayShorts[dayShort];
+            if (!groupedByDay[dayFull]) {
+                groupedByDay[dayFull] = [];
             }
-            
-            const groupedByDay = {};
-            const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-            
-            validLessons.forEach(lesson => {
-                const dayShort = lesson.day.toLowerCase().trim();
-                if (DAY_SHORTS[dayShort]) {
-                    const dayFull = DAY_SHORTS[dayShort];
-                    if (!groupedByDay[dayFull]) {
-                        groupedByDay[dayFull] = [];
-                    }
-                    groupedByDay[dayFull].push(lesson);
-                }
-            });
-            
-            const today = new Date();
-            
-            // Находим пятницу
-            let daysToFriday;
-            if (today.getDay() === 5) { // пятница
-                daysToFriday = 0;
-            } else if (today.getDay() > 5) { // сб, вс
-                daysToFriday = today.getDay() - 5;
-            } else { // пн-чт
-                daysToFriday = today.getDay() + 2;
-            }
-            
-            const friday = new Date(today);
-            friday.setDate(today.getDate() - daysToFriday);
-            
-            const weekDates = {};
-            for (let i = 0; i < 7; i++) {
-                const date = new Date(friday);
-                date.setDate(friday.getDate() + i);
-                const dayName = dayNames[date.getDay() === 0 ? 6 : date.getDay() - 1];
-                weekDates[dayName] = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-            }
-            
-            let report = '';
-            let totalIncome = 0;
-            
-            const reportDays = ['Пятница', 'Суббота', 'Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг'];
-            
-            reportDays.forEach(day => {
-                const lessons = groupedByDay[day] || [];
-                if (lessons.length === 0) return;
-                
-                const dateStr = weekDates[day] || '';
-                report += `${dateStr} ${day}\n`;
-                
-                lessons.sort((a, b) => {
-                    const timeA = a.time || '00:00';
-                    const timeB = b.time || '00:00';
-                    return timeA.localeCompare(timeB);
-                });
-                
-                lessons.forEach(lesson => {
-                    const rate = parseInt(lesson.rate) || 0;
-                    report += `${lesson.time} ${lesson.student} - ${rate}р\n`;
-                    totalIncome += rate;
-                });
-                
-                report += '\n';
-            });
-            
-            report += `Общий доход за неделю: ${totalIncome}р`;
-            
-            reportContent.textContent = report;
-            reportContainer.style.display = 'block';
+            groupedByDay[dayFull].push(lesson);
         }
-
+    });
+    
+    // Получаем текущую дату
+    const today = new Date();
+    
+    // Находим ближайшую субботу (если сегодня суббота - берем её, иначе предыдущую)
+    const currentDay = today.getDay(); // 0 - вс, 1 - пн, 2 - вт, 3 - ср, 4 - чт, 5 - пт, 6 - сб
+    
+    // Вычисляем сколько дней назад была суббота
+    let daysToSaturday;
+    if (currentDay === 6) { // сегодня суббота
+        daysToSaturday = 0;
+    } else if (currentDay === 0) { // сегодня воскресенье
+        daysToSaturday = 1; // суббота была вчера
+    } else { // пн-пт
+        daysToSaturday = currentDay + 1; // +1 потому что суббота перед понедельником
+    }
+    
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() - daysToSaturday);
+    
+    // Создаем массив дат для недели (с субботы по пятницу)
+    const weekDates = {};
+    const weekDays = ['Суббота', 'Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница'];
+    
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(saturday);
+        date.setDate(saturday.getDate() + i);
+        const dayName = weekDays[i];
+        // Форматируем дату как ДД.ММ
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        weekDates[dayName] = `${day}.${month}`;
+    }
+    
+    // Формируем отчет
+    let report = '';
+    let totalIncome = 0;
+    
+    // Дни в порядке: Суббота, Воскресенье, Понедельник, Вторник, Среда, Четверг, Пятница
+    const reportDays = ['Суббота', 'Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница'];
+    
+    reportDays.forEach(day => {
+        const lessons = groupedByDay[day] || [];
+        if (lessons.length === 0) return;
+        
+        const dateStr = weekDates[day] || '';
+        report += `${dateStr} ${day}\n`;
+        
+        // Сортируем уроки по времени
+        lessons.sort((a, b) => {
+            const timeA = a.time || '00:00';
+            const timeB = b.time || '00:00';
+            return timeA.localeCompare(timeB);
+        });
+        
+        lessons.forEach(lesson => {
+            const rate = parseInt(lesson.rate) || 0;
+            report += `${lesson.time} ${lesson.student} - ${rate}р\n`;
+            totalIncome += rate;
+        });
+        
+        report += '\n';
+    });
+    
+    report += `Общий доход за неделю: ${totalIncome}р`;
+    
+    reportContent.textContent = report;
+    reportContainer.style.display = 'block';
+}
         function copyReport() {
             const report = document.getElementById('report-content').textContent;
             if (!report) {
